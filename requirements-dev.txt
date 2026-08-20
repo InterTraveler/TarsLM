@@ -1,0 +1,15 @@
+# TarsLM 开发与测试依赖
+# 安装方式: pip install -r requirements-dev.txt
+
+# 先安装运行时依赖
+-r requirements.txt
+
+# 单元测试
+pytest>=8.0.0
+
+# 代码风格与静态检查
+ruff>=0.6.0
+pylint>=3.0.0
+
+# 类型检查
+pyright>=1.1.0

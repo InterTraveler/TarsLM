@@ -1,0 +1,83 @@
+# ============================================================
+# TarsLM .gitignore (PyCharm + Python ML)
+# ============================================================
+
+# --- Python 编译产物 ---
+*.pyc
+*.pyo
+__pycache__/
+
+# --- 虚拟环境 ---
+.venv/
+venv/
+env/
+
+# --- 模型权重与 Checkpoint ---
+checkpoints/
+checkpoints_chat/
+checkpoints_chat_*/
+exports/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.onnx
+
+# --- 数据文件 ---
+data/tokenizer/
+*.parquet
+*.arrow
+
+# --- 缓存与临时文件 ---
+cache/
+.cache/
+.jbeval/
+*.tmp
+*~
+*.swp
+*.swo
+
+# --- 日志与输出 ---
+logs/
+*.log
+tensorboard/
+lightning_logs/
+wandb/
+mlruns/
+
+# --- PyCharm / IDE ---
+.idea/
+.vscode/
+
+# --- 操作系统文件 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 环境变量与密钥 ---
+.env
+.env.local
+.env.*.local
+
+# --- 测试与类型检查缓存 ---
+.pytest_cache/
+pytest-of-*/
+tarslm_pytest_hf/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage*
+
+# --- 包构建产物 ---
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# --- 文档构建 ---
+site/
+_build/
+
+# --- 分布式训练临时文件 ---
+*.sav
+*.data-*

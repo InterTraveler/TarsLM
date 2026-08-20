@@ -1,0 +1,144 @@
+# TarsLM 服务器集群预训练配置
+# 路径: config/server.yaml
+# 适用场景: 8×A100(80G) / 8×H100 多卡集群，大规模预训练
+# 模型规模: ~6.7B 总参数，MoE 每 token 激活约 1.8B
+# 分布式策略: DeepSpeed ZeRO-2，使用 config/deepspeed_zero2.json
+# 启动命令: torchrun --nproc_per_node=8 main_pretrain.py --config config/server.yaml
+#
+# * 数据路径说明:
+#   本配置使用外部指定的语料路径，默认为 /data/pretrain_corpus/ 和
+#   /data/chat_corpus/ 占位。启动前请将 train_data_path 修改为实际语料目录。
+# ==================== 模型架构参数 ====================
+model:
+  # 词表大小（需与分词器一致）
+  vocab_size: 32000
+  # 隐藏层维度
+  hidden_size: 2048
+  # Transformer 层数
+  num_layers: 16
+  # 注意力头数
+  num_attention_heads: 16
+  # KV 头数（GQA: 4 个 Q 头共享 1 个 KV 头，省 KV Cache 显存）
+  num_key_value_heads: 4
+  # 前馈网络中间层维度（4x hidden_size，SwiGLU 标准比例）
+  intermediate_size: 8192
+  # 最大序列长度
+  max_seq_len: 4096
+  # RMSNorm epsilon（大模型略大，防数值不稳定）
+  norm_eps: 1.0e-5
+  # 注意力 dropout（大模型不加）
+  attention_dropout: 0.0
+  # 残差 dropout（大模型靠数据多样性，不加）
+  hidden_dropout: 0.0
+  # RoPE 旋转基频（大 base 支持长序列外推，Llama 3 风格）
+  rope_theta: 500000.0
+
+
+# ==================== MoE（混合专家）参数 ====================
+moe:
+  # 是否启用 MoE 替换标准 FFN
+  enabled: true
+  # 专家总数
+  num_experts: 8
+  # 每个 token 激活的专家数
+  top_k: 2
+  # 负载均衡辅助损失权重
+  load_balance_weight: 0.01
+  # Router z-loss 权重
+  router_z_loss_weight: 0.0
+
+
+# ==================== 硬件适配 ====================
+hardware:
+  # 是否启用梯度检查点（省显存）
+  enable_gradient_checkpointing: true
+  # DeepSpeed 配置路径（ZeRO-2；删除或设为 null/false 时回退 DDP）
+  deepspeed_config: "./config/deepspeed_zero2.json"
+
+
+# ==================== 预训练专属配置 ====================
+pretrain:
+  # ---------- 训练超参 ----------
+  training:
+    # 每 GPU 批量大小
+    batch_size: 1
+    # 梯度累积步数（等效 batch = 1 x 32 x 8GPU = 256）
+    gradient_accumulation_steps: 32
+    # 初始学习率
+    learning_rate: 3.0e-4
+    # 学习率预热步数（大 batch 需更长 warmup）
+    warmup_steps: 2000
+    # 总训练步数（约 52.4B token: 256 x 4096 x 50000）
+    max_steps: 50000
+    # 学习率调度器: cosine / linear / constant
+    lr_scheduler: "cosine"
+    # 梯度裁剪最大范数
+    max_grad_norm: 1.0
+    # AdamW 权重衰减
+    weight_decay: 0.1
+    # Adam 一阶矩衰减系数
+    adam_beta1: 0.9
+    # Adam 二阶矩衰减系数（LLM 常用 0.95）
+    adam_beta2: 0.95
+    # Adam 数值稳定项
+    adam_epsilon: 1.0e-8
+    # 日志打印间隔（步数）
+    log_interval: 10
+    # checkpoint 保存间隔（步数）
+    save_interval: 1000
+    # 评估间隔（步数）
+    eval_interval: 500
+    # 最多保留 checkpoint 数
+    keep_checkpoint_max: 3
+    # 是否启用混合精度训练
+    use_mixed_precision: true
+    # 混合精度类型: fp16 / bf16（A100/H100 推荐 bf16）
+    precision: "bf16"
+
+
+  # ---------- 数据集 ----------
+  dataset:
+    # 预训练语料路径（请修改为实际路径）
+    train_data_path: "/data/pretrain_corpus/"
+    # 分词器路径（请修改为实际路径）
+    tokenizer_path: "/data/tokenizer/"
+    # 语料格式，必填
+    data_format: jsonl
+    # 数据加载子进程数
+    num_workers: 4
+
+
+  # ---------- 路径 ----------
+  paths:
+    # checkpoint 保存目录
+    checkpoint_dir: "./checkpoints/"
+
+
+# ==================== 微调专属配置 ====================
+finetune:
+  # 预训练 checkpoint 目录（自动选择步数最大的 checkpoint-n）
+  pretrained_checkpoint: "./checkpoints/"
+  # 以下字段覆盖预训练配置中的同名字段，用于微调场景
+  training:
+    # 微调关闭梯度累积（对话数据少，每步更新更有效）
+    gradient_accumulation_steps: 1
+    # 微调学习率低于预训练（避免灾难性遗忘）
+    learning_rate: 2.0e-4
+    # 微调预热步数（短任务不沿用预训练 2000 步）
+    warmup_steps: 100
+    # 微调总步数
+    max_steps: 8000
+    # 微调少量正则化
+    weight_decay: 0.01
+    # 日志打印间隔
+    log_interval: 20
+    # checkpoint 保存间隔
+    save_interval: 1000
+    # 评估间隔
+    eval_interval: 500
+  dataset:
+    # 对话语料路径（请修改为实际路径）
+    train_data_path: "/data/chat_corpus/"
+  paths:
+    # 微调产物输出目录
+    checkpoint_dir: "./checkpoints_chat_server/"

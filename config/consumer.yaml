@@ -1,0 +1,135 @@
+# TarsLM 消费级单卡预训练配置（8GB 显存，约 20~50 小时）
+# 路径: config/consumer.yaml
+# 适用场景: RTX 3060/4060 等 8GB 单卡，个人开发者日常训练
+# 模型规模: ~260M 参数，GQA 模式，fp16 + 梯度检查点
+# 预训练规模: 等效 batch 16 x seq 1024 x 60000 步 ≈ 9.8 亿 token
+# 启动命令: python main_pretrain.py --config config/consumer.yaml
+#
+# * 数据路径说明:
+#   本配置使用外部指定的语料路径，默认为“/data/pretrain_corpus/”、“/data/chat_corpus/”占位。
+#   启动前请将 train_data_path 修改为实际语料目录，否则程序会报错提示“未找到数据文件”。
+# ==================== 模型架构参数 ====================
+model:
+  # 词表大小（需与分词器一致）
+  vocab_size: 16000
+  # 隐藏层维度
+  hidden_size: 1024
+  # Transformer 层数
+  num_layers: 16
+  # Q 头数（head_dim = 1024/16 = 64）
+  num_attention_heads: 16
+  # GQA: 4 个 Q 头共享 1 个 KV 头，省 4x KV Cache
+  num_key_value_heads: 4
+  # 4x hidden_size（SwiGLU 标准比例）
+  intermediate_size: 4096
+  # 对话场景需要保留一定的上下文长度
+  max_seq_len: 1024
+  # RMSNorm 防除零常数
+  norm_eps: 1.0e-6
+  # 注意力 dropout，0 可加速收敛
+  attention_dropout: 0.0
+  # 残差 dropout，保留少量正则化
+  hidden_dropout: 0.1
+  # RoPE 旋转基频
+  rope_theta: 10000.0
+
+
+# ==================== MoE（混合专家）参数 ====================
+moe:
+  # 单卡训练关闭 MoE，减少显存和路由开销
+  enabled: false
+  # 专家总数，关闭 MoE 后不生效
+  num_experts: 2
+  # 每个 token 激活的专家数，关闭 MoE 后不生效
+  top_k: 1
+
+
+# ==================== 硬件适配 ====================
+hardware:
+  # 梯度检查点：8GB 显存下必须开启
+  enable_gradient_checkpointing: true
+
+
+# ==================== 预训练专属配置 ====================
+pretrain:
+  # ---------- 训练超参 ----------
+  training:
+    # 每 GPU 微观 batch
+    batch_size: 2
+    # 等效 batch = 2 x 8 = 16
+    gradient_accumulation_steps: 8
+    # 初始学习率
+    learning_rate: 3.0e-4
+    # 预热约占总步数 3%
+    warmup_steps: 1800
+    # 约 9.8 亿 token: 16 x 1024 x 60000
+    max_steps: 60000
+    # cosine 衰减到 0
+    lr_scheduler: "cosine"
+    # 梯度裁剪
+    max_grad_norm: 1.0
+    # AdamW 权重衰减
+    weight_decay: 0.1
+    # Adam 一阶矩衰减系数
+    adam_beta1: 0.9
+    # Adam 二阶矩衰减系数
+    adam_beta2: 0.95
+    # Adam 数值稳定项
+    adam_epsilon: 1.0e-8
+    # 日志打印间隔
+    log_interval: 50
+    # checkpoint 保存间隔
+    save_interval: 5000
+    # 评估间隔
+    eval_interval: 5000
+    # 最多保留 checkpoint 数
+    keep_checkpoint_max: 3
+    # 混合精度开关
+    use_mixed_precision: true
+    # fp16：消费级 GPU 通用
+    precision: "fp16"
+
+
+  # ---------- 数据集 ----------
+  dataset:
+    # * 预训练语料路径（请修改为实际路径，以下为占位值）
+    train_data_path: "/data/pretrain_corpus/"
+    # 分词器路径（请修改为实际路径）
+    tokenizer_path: "/data/tokenizer/"
+    # 语料格式，必填
+    data_format: jsonl
+    # 数据加载子进程数
+    num_workers: 2
+
+
+  # ---------- 路径 ----------
+  paths:
+    # checkpoint 保存目录
+    checkpoint_dir: "./checkpoints/"
+
+
+# ==================== 微调专属配置 ====================
+finetune:
+  # 预训练 checkpoint 目录（自动选择步数最大的 checkpoint-n）
+  pretrained_checkpoint: "./checkpoints/"
+  training:
+    # 微调关闭梯度累积，对话数据少时每步更新更有效
+    gradient_accumulation_steps: 1
+    # 低于预训练学习率，避免灾难性遗忘
+    learning_rate: 1.5e-4
+    # 微调总步数
+    max_steps: 6000
+    # 微调少量正则化
+    weight_decay: 0.01
+    # 日志打印间隔
+    log_interval: 50
+    # checkpoint 保存间隔
+    save_interval: 2000
+    # 评估间隔
+    eval_interval: 1000
+  dataset:
+    # * 对话语料路径（请修改为实际路径，以下为占位值）
+    train_data_path: "/data/chat_corpus/"
+  paths:
+    # 微调产物输出目录
+    checkpoint_dir: "./checkpoints_chat_consumer/"

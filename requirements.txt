@@ -1,0 +1,46 @@
+# ============================================================
+# TarsLM 项目依赖清单
+# 功能：列出项目运行所需的核心Python依赖库及版本
+# 安装方式：pip install -r requirements.txt
+# ============================================================
+
+# PyTorch核心框架（根据CUDA版本选择对应安装命令）
+# CPU版本: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# CUDA 11.8版本: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# CUDA 12.1版本: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# CUDA 12.4版本: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+torch>=2.1.0,<3.0.0
+
+# HuggingFace生态工具集
+transformers>=4.45.0,<6.0.0
+datasets>=2.16.0,<6.0.0
+accelerate>=0.25.0
+huggingface_hub>=0.20.0
+
+
+# 分词器
+tokenizers>=0.19.0
+
+# 聊天模板渲染
+jinja2>=3.1.0
+
+# 数据处理与计算
+numpy>=1.24.0,<3.0.0
+pyarrow>=15.0.0
+pyyaml>=6.0
+
+# 进度条与日志
+tqdm>=4.66.0
+tensorboard>=2.14.0
+
+# 模型序列化（可选）
+safetensors>=0.4.0
+
+# ONNX导出（可选）
+# onnx>=1.14.0
+# onnxruntime>=1.15.0
+
+# FlashAttention 由 PyTorch SDPA 在受支持的 GPU 上自动启用，无需额外安装。
+
+# 分布式训练（server.yaml 的 ZeRO-2 配置需要，可选）
+# deepspeed>=0.12.0
